@@ -1,25 +1,16 @@
-from pydoc import describe
+from typing import Optional
 import discord
-import os
-from discord.ext import commands, tasks
-from discord.utils import get
-from discord.ui import Button, View, Select
+from discord.ext import commands
 from discord import app_commands
 import asyncio
-import sys
-from app.bot.helper.confighelper import MEMBARR_VERSION, switch, Discord_bot_token, plex_roles, jellyfin_roles
+from app.bot.helper.confighelper import Discord_bot_token, plex_roles, jellyfin_roles
 import app.bot.helper.confighelper as confighelper
 import app.bot.helper.jellyfinhelper as jelly
-from app.bot.helper.message import *
-from requests import ConnectTimeout
+from app.bot.helper.message import embederror
 from plexapi.myplex import MyPlexAccount
+from requests.exceptions import ConnectTimeout
 
 maxroles = 10
-
-if switch == 0:
-    print("Missing Config.")
-    sys.exit()
-
 
 class Bot(commands.Bot):
     def __init__(self) -> None:
@@ -44,20 +35,20 @@ class Bot(commands.Bot):
 
     async def setup_hook(self):
         print("Loading media server connectors")
-        await self.load_extension(f'app.bot.cogs.app')
+        await self.load_extension('app.bot.cogs.app')
 
 
 bot = Bot()
 
 
 async def reload():
-    await bot.reload_extension(f'app.bot.cogs.app')
+    await bot.reload_extension('app.bot.cogs.app')
 
 
 async def getuser(interaction, server, type):
     value = None
     await interaction.user.send("Please reply with your {} {}:".format(server, type))
-    while (value == None):
+    while (value is None):
         def check(m):
             return m.author == interaction.user and not m.guild
 
@@ -65,7 +56,7 @@ async def getuser(interaction, server, type):
             value = await bot.wait_for('message', timeout=200, check=check)
             return value.content
         except asyncio.TimeoutError:
-            message = "Timed Out. Try again."
+            await embederror(interaction.response, "Timed Out. Try again.")
             return None
 
 
@@ -199,7 +190,7 @@ async def jellyrolels(interaction: discord.Interaction):
 
 @jellyfin_commands.command(name="setup", description="Setup Jellyfin integration")
 @app_commands.checks.has_permissions(administrator=True)
-async def setupjelly(interaction: discord.Interaction, server_url: str, api_key: str, external_url: str = None):
+async def setupjelly(interaction: discord.Interaction, server_url: str, api_key: str, external_url: Optional[str] = None):
     await interaction.response.defer()
     # get rid of training slashes
     server_url = server_url.rstrip('/')
@@ -223,7 +214,7 @@ async def setupjelly(interaction: discord.Interaction, server_url: str, api_key:
         else:
             await embederror(interaction.followup,
                              "Unknown error occurred while connecting to Jellyfin. Check Membarr logs.")
-    except ConnectTimeout as e:
+    except ConnectTimeout as _:
         await embederror(interaction.followup,
                          "Connection to server timed out. Check that Jellyfin is online and reachable.")
         return
